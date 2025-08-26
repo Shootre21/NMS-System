@@ -1,0 +1,5 @@
+{
+  "name": "NMS IPS Monitor",
+  "description": "A web-based Network Management System (NMS) dashboard to monitor the availability of Internal and External Intrusion Prevention Systems (IPS) with AI-powered troubleshooting.",
+  "requestFramePermissions": []
+}
