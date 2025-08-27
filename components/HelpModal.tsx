@@ -21,7 +21,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                     
                     <h3 className="text-lg font-semibold text-cyan-500 pt-2">IPS Management</h3>
                     <ul className="list-disc list-inside space-y-2 pl-2">
-                        <li><strong>Add IPS:</strong> Use the '+' button, select the IPS type (Internal/External), enter a valid IP address, and click "Add IPS".</li>
+                        <li><strong>Add IPS:</strong> Use the '+' button, select the IPS type (Internal/External), enter a valid IP address, optionally provide a name for classification, and click "Add IPS".</li>
                         <li><strong>Remove IPS:</strong> Use the '-' button, select the type, enter the exact IP address to remove, and click "Remove IPS".</li>
                         <li>Duplicate IP addresses are not allowed. The list of Major DNS Providers is not manageable.</li>
                     </ul>
@@ -37,9 +37,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                      <div className="mt-2 p-3 bg-gray-700/50 rounded-lg text-sm">
                         <p><strong className="text-yellow-400">Note:</strong> Status is checked using an HTTP/S request, not a traditional ICMP ping, due to browser security limitations. An 'UP' status indicates the host is reachable over the web. IPs without a web server may show as 'DOWN'.</p>
                     </div>
-
-                    <h3 className="text-lg font-semibold text-cyan-500 pt-2">AI Troubleshooting</h3>
-                    <p>When an IPS status is 'DOWN', a "Troubleshoot" button will appear. Clicking it will use the Gemini API to provide a step-by-step guide to diagnose the issue.</p>
                 </div>
             </div>
         </div>

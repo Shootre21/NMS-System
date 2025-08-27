@@ -3,12 +3,13 @@ import React, { useState } from 'react';
 import { IPType } from '../types';
 
 interface IpManagementProps {
-    onAddIp: (address: string, type: IPType) => void;
+    onAddIp: (address: string, type: IPType, name?: string) => void;
     onRemoveIp: (address: string, type: IPType) => void;
 }
 
 const IpManagement: React.FC<IpManagementProps> = ({ onAddIp, onRemoveIp }) => {
     const [address, setAddress] = useState('');
+    const [name, setName] = useState('');
     const [managementType, setManagementType] = useState<IPType>('Internal');
     const [action, setAction] = useState<'add' | 'remove'>('add');
 
@@ -16,11 +17,12 @@ const IpManagement: React.FC<IpManagementProps> = ({ onAddIp, onRemoveIp }) => {
         e.preventDefault();
         if (!address.trim()) return;
         if (action === 'add') {
-            onAddIp(address, managementType);
+            onAddIp(address, managementType, name);
         } else {
             onRemoveIp(address, managementType);
         }
         setAddress('');
+        setName('');
     };
 
     return (
@@ -43,9 +45,19 @@ const IpManagement: React.FC<IpManagementProps> = ({ onAddIp, onRemoveIp }) => {
                     type="text"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder={`e.g., 192.168.1.100`}
+                    placeholder={action === 'add' ? 'IP Address (e.g., 192.168.1.100)' : 'IP Address to Remove'}
                     className="flex-grow w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                    required
                 />
+                {action === 'add' && (
+                     <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Optional: Name (e.g., NAS)"
+                        className="flex-grow w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                    />
+                )}
                 <button type="submit" className="w-full sm:w-auto px-4 py-1.5 font-semibold text-white bg-cyan-600 rounded-md hover:bg-cyan-500 transition-colors">
                     {action === 'add' ? 'Add IPS' : 'Remove IPS'}
                 </button>

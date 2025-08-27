@@ -9,9 +9,8 @@ interface DashboardPageProps {
     internalIps: IPS[];
     externalIps: IPS[];
     dnsProviders: IPS[];
-    onAddIp: (address: string, type: IPType) => void;
+    onAddIp: (address: string, type: IPType, name?: string) => void;
     onRemoveIp: (address: string, type: IPType) => void;
-    onTroubleshoot: (ip: IPS) => void;
     internalIpsCount: number;
     externalIpsCount: number;
     dnsProvidersCount: number;
@@ -21,7 +20,7 @@ interface DashboardPageProps {
 
 const DashboardPage: React.FC<DashboardPageProps> = (props) => {
     const { 
-        internalIps, externalIps, dnsProviders, onAddIp, onRemoveIp, onTroubleshoot,
+        internalIps, externalIps, dnsProviders, onAddIp, onRemoveIp,
         internalIpsCount, externalIpsCount, dnsProvidersCount, monitoringInterval, setMonitoringInterval
     } = props;
 
@@ -34,10 +33,10 @@ const DashboardPage: React.FC<DashboardPageProps> = (props) => {
                 </div>
                 <IpManagement onAddIp={onAddIp} onRemoveIp={onRemoveIp} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <IpList title="Internal IPS" ips={internalIps} onTroubleshoot={onTroubleshoot} />
-                     <IpList title="External IPS" ips={externalIps} onTroubleshoot={onTroubleshoot} />
+                     <IpList title="Internal IPS" ips={internalIps} />
+                     <IpList title="External IPS" ips={externalIps} />
                 </div>
-                <IpList title="Major DNS Providers" ips={dnsProviders} onTroubleshoot={onTroubleshoot} />
+                <IpList title="Major DNS Providers" ips={dnsProviders} />
             </main>
             <aside className="lg:col-span-1">
                 <SystemInfoPanel

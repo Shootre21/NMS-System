@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { IPS, IPStatus, IPType, Device } from './types';
 import HelpModal from './components/HelpModal';
-import TroubleshootingModal from './components/TroubleshootingModal';
-import { getTroubleshootingSteps } from './services/geminiService';
 import Navigation from './components/Navigation';
 import DashboardPage from './components/DashboardPage';
 import TroubleshootingPage from './components/TroubleshootingPage';
@@ -12,12 +10,12 @@ const App: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<'dashboard' | 'troubleshooting' | 'devices'>('dashboard');
 
     const [internalIps, setInternalIps] = useState<IPS[]>([
-        { id: 'int-1', address: '192.168.1.1', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
-        { id: 'int-2', address: '10.0.0.5', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
+        { id: 'int-1', address: '192.168.1.1', name: 'Main Router', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
+        { id: 'int-2', address: '10.0.0.5', name: 'NAS', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
     ]);
     const [externalIps, setExternalIps] = useState<IPS[]>([
-        { id: 'ext-1', address: '203.0.113.10', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
-        { id: 'ext-2', address: '198.51.100.22', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'ext-1', address: '203.0.113.10', name: 'Primary WAN', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'ext-2', address: '198.51.100.22', name: 'Backup WAN', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
     ]);
     const [dnsProviders, setDnsProviders] = useState<IPS[]>([
         { id: 'dns-1', address: '1.1.1.1', name: 'Cloudflare DNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
@@ -38,10 +36,6 @@ const App: React.FC = () => {
     const [monitoringInterval, setMonitoringInterval] = useState<number>(5);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
-    const [isTroubleshootingModalOpen, setIsTroubleshootingModalOpen] = useState<boolean>(false);
-    const [troubleshootingIp, setTroubleshootingIp] = useState<IPS | null>(null);
-    const [troubleshootingResult, setTroubleshootingResult] = useState<string>('');
-    const [isTroubleshooting, setIsTroubleshooting] = useState<boolean>(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setNotification(null), 3000);
@@ -107,7 +101,7 @@ const App: React.FC = () => {
         setNotification({ message, type });
     };
 
-    const addIp = (address: string, type: IPType) => {
+    const addIp = (address: string, type: IPType, name?: string) => {
         const allIps = [...internalIps, ...externalIps, ...dnsProviders];
         const setIpList = type === 'Internal' ? setInternalIps : setExternalIps;
 
@@ -124,35 +118,20 @@ const App: React.FC = () => {
         const newIp: IPS = {
             id: `${type.toLowerCase()}-${Date.now()}`,
             address,
+            name: name?.trim() ? name.trim() : undefined,
             status: 'pending',
             type,
             lastSuccessfulPing: null,
             history: [],
         };
         setIpList(prev => [...prev, newIp]);
-        showNotification(`${type} IPS '${address}' added successfully.`, 'success');
+        showNotification(`${type} IPS '${name || address}' added successfully.`, 'success');
     };
 
     const removeIp = (address: string, type: IPType) => {
         const setIpList = type === 'Internal' ? setInternalIps : setExternalIps;
         setIpList(prev => prev.filter(ip => ip.address !== address));
         showNotification(`${type} IPS '${address}' removed successfully.`, 'success');
-    };
-
-    const handleTroubleshoot = async (ip: IPS) => {
-        setTroubleshootingIp(ip);
-        setIsTroubleshootingModalOpen(true);
-        setIsTroubleshooting(true);
-        setTroubleshootingResult('');
-        try {
-            const result = await getTroubleshootingSteps(ip.address);
-            setTroubleshootingResult(result);
-        } catch (error) {
-            console.error("Gemini API error:", error);
-            setTroubleshootingResult("Failed to get troubleshooting steps. Please check the console and ensure your API key is configured.");
-        } finally {
-            setIsTroubleshooting(false);
-        }
     };
 
     const renderPage = () => {
@@ -164,7 +143,6 @@ const App: React.FC = () => {
                     dnsProviders={dnsProviders}
                     onAddIp={addIp}
                     onRemoveIp={removeIp}
-                    onTroubleshoot={handleTroubleshoot}
                     internalIpsCount={internalIps.length}
                     externalIpsCount={externalIps.length}
                     dnsProvidersCount={dnsProviders.length}
@@ -182,7 +160,6 @@ const App: React.FC = () => {
                     dnsProviders={dnsProviders}
                     onAddIp={addIp}
                     onRemoveIp={removeIp}
-                    onTroubleshoot={handleTroubleshoot}
                     internalIpsCount={internalIps.length}
                     externalIpsCount={externalIps.length}
                     dnsProvidersCount={dnsProviders.length}
@@ -224,13 +201,6 @@ const App: React.FC = () => {
                 )}
             </div>
             <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
-            <TroubleshootingModal 
-                isOpen={isTroubleshootingModalOpen} 
-                onClose={() => setIsTroubleshootingModalOpen(false)}
-                ip={troubleshootingIp}
-                result={troubleshootingResult}
-                isLoading={isTroubleshooting}
-            />
         </div>
     );
 };
