@@ -1,14 +1,16 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { IPS, IPStatus, IPType } from './types';
-import SystemInfoPanel from './components/SystemInfoPanel';
-import IpList from './components/IpList';
-import IpManagement from './components/IpManagement';
+import { IPS, IPStatus, IPType, Device } from './types';
 import HelpModal from './components/HelpModal';
 import TroubleshootingModal from './components/TroubleshootingModal';
 import { getTroubleshootingSteps } from './services/geminiService';
+import Navigation from './components/Navigation';
+import DashboardPage from './components/DashboardPage';
+import TroubleshootingPage from './components/TroubleshootingPage';
+import DevicesPage from './components/DevicesPage';
 
 const App: React.FC = () => {
+    const [currentPage, setCurrentPage] = useState<'dashboard' | 'troubleshooting' | 'devices'>('dashboard');
+
     const [internalIps, setInternalIps] = useState<IPS[]>([
         { id: 'int-1', address: '192.168.1.1', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
         { id: 'int-2', address: '10.0.0.5', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
@@ -23,6 +25,15 @@ const App: React.FC = () => {
         { id: 'dns-3', address: '9.9.9.9', name: 'Quad9 DNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
         { id: 'dns-4', address: '208.67.222.222', name: 'OpenDNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
     ]);
+    const [firewalls, setFirewalls] = useState<Device[]>([
+        { id: 'fw-1', address: '10.0.0.1', name: 'Main Office Firewall', status: 'pending', type: 'Firewall', lastSuccessfulPing: null, model: 'Palo Alto PA-460' },
+        { id: 'fw-2', address: '192.168.1.254', name: 'Branch Office Firewall', status: 'pending', type: 'Firewall', lastSuccessfulPing: null, model: 'Cisco Firepower 1010' },
+    ]);
+    const [switches, setSwitches] = useState<Device[]>([
+        { id: 'sw-1', address: '10.0.0.2', name: 'Core Switch A', status: 'pending', type: 'Switch', lastSuccessfulPing: null, model: 'Arista 7050SX' },
+        { id: 'sw-2', address: '10.0.0.3', name: 'Core Switch B', status: 'pending', type: 'Switch', lastSuccessfulPing: null, model: 'Arista 7050SX' },
+        { id: 'sw-3', address: '192.168.1.253', name: 'Branch Access Switch', status: 'pending', type: 'Switch', lastSuccessfulPing: null, model: 'Cisco Catalyst 9200' },
+    ]);
     
     const [monitoringInterval, setMonitoringInterval] = useState<number>(5);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -31,7 +42,6 @@ const App: React.FC = () => {
     const [troubleshootingIp, setTroubleshootingIp] = useState<IPS | null>(null);
     const [troubleshootingResult, setTroubleshootingResult] = useState<string>('');
     const [isTroubleshooting, setIsTroubleshooting] = useState<boolean>(false);
-
 
     useEffect(() => {
         const timer = setTimeout(() => setNotification(null), 3000);
@@ -50,8 +60,6 @@ const App: React.FC = () => {
             };
 
             try {
-                // Use fetch in 'no-cors' mode as a proxy for a ping. A successful request (even opaque) means the host is reachable.
-                // A failure (timeout, network error) means it's down. We try HTTPS first, then HTTP.
                 await fetch(`https://${ip.address}`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
                 return updateIpWithStatus('up');
             } catch (error) {
@@ -64,19 +72,36 @@ const App: React.FC = () => {
             }
         }));
     }, []);
+    
+    const checkDeviceStatus = useCallback(async (devices: Device[]): Promise<Device[]> => {
+        return Promise.all(devices.map(async (device) => {
+            const updateDeviceWithStatus = (newStatus: IPStatus): Device => {
+                const newLastSuccessfulPing = newStatus === 'up' ? new Date() : device.lastSuccessfulPing;
+                return { ...device, status: newStatus, lastSuccessfulPing: newLastSuccessfulPing };
+            };
+
+            try {
+                await fetch(`https://${device.address}`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
+                return updateDeviceWithStatus('up');
+            } catch (error) {
+                return updateDeviceWithStatus('down');
+            }
+        }));
+    }, []);
 
     useEffect(() => {
         const runChecks = () => {
             checkIpStatus(internalIps).then(setInternalIps);
             checkIpStatus(externalIps).then(setExternalIps);
             checkIpStatus(dnsProviders).then(setDnsProviders);
+            checkDeviceStatus(firewalls).then(setFirewalls);
+            checkDeviceStatus(switches).then(setSwitches);
         }
-        runChecks(); // Initial check
+        runChecks(); 
         const intervalId = setInterval(runChecks, monitoringInterval * 1000);
 
         return () => clearInterval(intervalId);
-    }, [internalIps.length, externalIps.length, dnsProviders.length, monitoringInterval, checkIpStatus]);
-
+    }, [internalIps.length, externalIps.length, dnsProviders.length, firewalls.length, switches.length, monitoringInterval, checkIpStatus, checkDeviceStatus]);
 
     const showNotification = (message: string, type: 'success' | 'error') => {
         setNotification({ message, type });
@@ -130,6 +155,43 @@ const App: React.FC = () => {
         }
     };
 
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'dashboard':
+                return <DashboardPage
+                    internalIps={internalIps}
+                    externalIps={externalIps}
+                    dnsProviders={dnsProviders}
+                    onAddIp={addIp}
+                    onRemoveIp={removeIp}
+                    onTroubleshoot={handleTroubleshoot}
+                    internalIpsCount={internalIps.length}
+                    externalIpsCount={externalIps.length}
+                    dnsProvidersCount={dnsProviders.length}
+                    monitoringInterval={monitoringInterval}
+                    setMonitoringInterval={setMonitoringInterval}
+                />;
+            case 'troubleshooting':
+                return <TroubleshootingPage />;
+            case 'devices':
+                return <DevicesPage firewalls={firewalls} switches={switches} />;
+            default:
+                return <DashboardPage
+                    internalIps={internalIps}
+                    externalIps={externalIps}
+                    dnsProviders={dnsProviders}
+                    onAddIp={addIp}
+                    onRemoveIp={removeIp}
+                    onTroubleshoot={handleTroubleshoot}
+                    internalIpsCount={internalIps.length}
+                    externalIpsCount={externalIps.length}
+                    dnsProvidersCount={dnsProviders.length}
+                    monitoringInterval={monitoringInterval}
+                    setMonitoringInterval={setMonitoringInterval}
+                />;
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 p-4 sm:p-6 lg:p-8 font-fira">
             <div className="max-w-7xl mx-auto">
@@ -149,25 +211,12 @@ const App: React.FC = () => {
                     </button>
                 </header>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <main className="lg:col-span-2 space-y-6">
-                        <IpManagement onAddIp={addIp} onRemoveIp={removeIp} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <IpList title="Internal IPS" ips={internalIps} onTroubleshoot={handleTroubleshoot} />
-                             <IpList title="External IPS" ips={externalIps} onTroubleshoot={handleTroubleshoot} />
-                        </div>
-                        <IpList title="Major DNS Providers" ips={dnsProviders} onTroubleshoot={handleTroubleshoot} />
-                    </main>
-                    <aside className="lg:col-span-1">
-                        <SystemInfoPanel
-                            internalIpsCount={internalIps.length}
-                            externalIpsCount={externalIps.length}
-                            dnsProvidersCount={dnsProviders.length}
-                            monitoringInterval={monitoringInterval}
-                            setMonitoringInterval={setMonitoringInterval}
-                        />
-                    </aside>
-                </div>
+                <Navigation currentPage={currentPage} setCurrentPage={setCurrentPage} />
+
+                <main className="mt-6">
+                    {renderPage()}
+                </main>
+
                 {notification && (
                     <div className={`fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white ${notification.type === 'success' ? 'bg-green-600/90' : 'bg-red-600/90'} animate-fade-in-out`}>
                         {notification.message}
