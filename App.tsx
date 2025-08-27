@@ -10,18 +10,18 @@ import { getTroubleshootingSteps } from './services/geminiService';
 
 const App: React.FC = () => {
     const [internalIps, setInternalIps] = useState<IPS[]>([
-        { id: 'int-1', address: '192.168.1.1', status: 'pending', type: 'Internal', lastSuccessfulPing: null },
-        { id: 'int-2', address: '10.0.0.5', status: 'pending', type: 'Internal', lastSuccessfulPing: null },
+        { id: 'int-1', address: '192.168.1.1', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
+        { id: 'int-2', address: '10.0.0.5', status: 'pending', type: 'Internal', lastSuccessfulPing: null, history: [] },
     ]);
     const [externalIps, setExternalIps] = useState<IPS[]>([
-        { id: 'ext-1', address: '203.0.113.10', status: 'pending', type: 'External', lastSuccessfulPing: null },
-        { id: 'ext-2', address: '198.51.100.22', status: 'pending', type: 'External', lastSuccessfulPing: null },
+        { id: 'ext-1', address: '203.0.113.10', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'ext-2', address: '198.51.100.22', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
     ]);
     const [dnsProviders, setDnsProviders] = useState<IPS[]>([
-        { id: 'dns-1', address: '1.1.1.1', name: 'Cloudflare DNS', status: 'pending', type: 'External', lastSuccessfulPing: null },
-        { id: 'dns-2', address: '8.8.8.8', name: 'Google DNS', status: 'pending', type: 'External', lastSuccessfulPing: null },
-        { id: 'dns-3', address: '9.9.9.9', name: 'Quad9 DNS', status: 'pending', type: 'External', lastSuccessfulPing: null },
-        { id: 'dns-4', address: '208.67.222.222', name: 'OpenDNS', status: 'pending', type: 'External', lastSuccessfulPing: null },
+        { id: 'dns-1', address: '1.1.1.1', name: 'Cloudflare DNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'dns-2', address: '8.8.8.8', name: 'Google DNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'dns-3', address: '9.9.9.9', name: 'Quad9 DNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
+        { id: 'dns-4', address: '208.67.222.222', name: 'OpenDNS', status: 'pending', type: 'External', lastSuccessfulPing: null, history: [] },
     ]);
     
     const [monitoringInterval, setMonitoringInterval] = useState<number>(5);
@@ -40,17 +40,26 @@ const App: React.FC = () => {
 
     const checkIpStatus = useCallback(async (ips: IPS[]): Promise<IPS[]> => {
         return Promise.all(ips.map(async (ip) => {
+            const updateIpWithStatus = (newStatus: IPStatus): IPS => {
+                const newHistory = [...ip.history];
+                if (newStatus !== ip.status) {
+                    newHistory.push({ status: newStatus, timestamp: new Date() });
+                }
+                const newLastSuccessfulPing = newStatus === 'up' ? new Date() : ip.lastSuccessfulPing;
+                return { ...ip, status: newStatus, lastSuccessfulPing: newLastSuccessfulPing, history: newHistory };
+            };
+
             try {
                 // Use fetch in 'no-cors' mode as a proxy for a ping. A successful request (even opaque) means the host is reachable.
                 // A failure (timeout, network error) means it's down. We try HTTPS first, then HTTP.
                 await fetch(`https://${ip.address}`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
-                return { ...ip, status: 'up' as IPStatus, lastSuccessfulPing: new Date() };
+                return updateIpWithStatus('up');
             } catch (error) {
                 try {
                     await fetch(`http://${ip.address}`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
-                    return { ...ip, status: 'up' as IPStatus, lastSuccessfulPing: new Date() };
+                    return updateIpWithStatus('up');
                 } catch (httpError) {
-                    return { ...ip, status: 'down' as IPStatus };
+                    return updateIpWithStatus('down');
                 }
             }
         }));
@@ -93,6 +102,7 @@ const App: React.FC = () => {
             status: 'pending',
             type,
             lastSuccessfulPing: null,
+            history: [],
         };
         setIpList(prev => [...prev, newIp]);
         showNotification(`${type} IPS '${address}' added successfully.`, 'success');
